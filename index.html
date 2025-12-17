@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>VoxGen Pro - Pixel Art Engine</title>
+    <style>
+        /* --- 1. Variables and Base Reset --- */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@500&display=swap');
+
+        :root {
+            --bg-deep: #0e111a;
+            /* Darker background */
+            --bg-glass: rgba(22, 28, 40, 0.8);
+            /* Refined translucent frame */
+            --bg-input: rgba(30, 36, 50, 0.8);
+            /* Slightly darker input background */
+            --accent: #5d8cf2;
+            /* Brighter, clearer blue accent */
+            --accent-hover: #4e7fe0;
+            --text-main: #e8ebf0;
+            /* Near-white main text */
+            --text-muted: #95a3b8;
+            /* Muted grey */
+            --border: rgba(148, 163, 184, 0.1);
+            /* Fainter border */
+            --shadow-glow: 0 0 15px rgba(93, 140, 242, 0.25);
+            --warning: #f59e0b;
+        }
+
+        * {
+            box-sizing: border-box;
+            outline: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-deep);
+            background-image:
+                radial-gradient(at 0% 0%, hsla(230, 20%, 8%, 1) 0, transparent 50%),
+                radial-gradient(at 50% 0%, hsla(220, 40%, 25%, 1) 0, transparent 50%),
+                radial-gradient(at 100% 0%, hsla(280, 40%, 25%, 1) 0, transparent 50%);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        /* --- 2. Main Layout --- */
+        .app-frame {
+            background: var(--bg-glass);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 28px;
+            box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.6);
+            width: 100%;
+            max-width: 950px;
+            display: grid;
+            grid-template-columns: 1fr 360px;
+            overflow: hidden;
+            animation: fadeIn 0.6s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @media (max-width: 800px) {
+            .app-frame {
+                grid-template-columns: 1fr;
+                max-width: 500px;
+            }
+        }
+
+        /* --- 3. Visual Side (Left) --- */
+        .visual-area {
+            padding: 40px;
+            background: rgba(0, 0, 0, 0.15);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 40px;
+            position: relative;
+            min-height: 400px;
+        }
+
+        .canvas-container {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .canvas-label {
+            font-family: 'Inter', sans-serif;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        canvas {
+            image-rendering: pixelated;
+            background-color: #1a1a1a;
+            background-image:
+                linear-gradient(45deg, #282828 25%, transparent 25%),
+                linear-gradient(-45deg, #282828 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #282828 75%),
+                linear-gradient(-45deg, transparent 75%, #282828 75%);
+            background-size: 20px 20px;
+            border: 2px solid var(--text-main);
+            border-radius: 12px;
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.6);
+            transition: all 0.3s ease-in-out;
+        }
+
+        canvas:hover {
+            transform: scale(1.04);
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.8), var(--shadow-glow);
+        }
+
+        .tiling-preview {
+            position: absolute;
+            bottom: 25px;
+            right: 25px;
+            background: var(--bg-input);
+            padding: 10px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Unavailable Message Styling */
+        .dev-message {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 30px;
+            border: 2px dashed var(--warning);
+            border-radius: 16px;
+            background: rgba(245, 158, 11, 0.05);
+            width: 256px;
+            height: 256px;
+            color: var(--warning);
+            gap: 15px;
+            box-shadow: 0 0 10px rgba(245, 158, 11, 0.3);
+        }
+
+        .dev-icon {
+            font-size: 2.5rem;
+        }
+
+        .dev-text {
+            font-size: 0.95rem;
+            line-height: 1.5;
+            font-weight: 600;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* --- 4. Controls Side (Right) --- */
+        .controls-area {
+            padding: 35px;
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+            overflow-y: auto;
+        }
+
+        .header h1 {
+            font-size: 1.4rem;
+            margin: 0;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--text-main) 0%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header p {
+            margin: 4px 0 0;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        /* Inputs & Groups */
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .label-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .val-display {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent);
+            font-weight: 700;
+        }
+
+        /* Text Input */
+        input[type="text"] {
+            width: 100%;
+            background: var(--bg-input);
+            border: 2px solid var(--border);
+            color: var(--text-main);
+            padding: 14px 16px;
+            border-radius: 10px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            transition: 0.2s;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+        }
+
+        input[type="text"]:focus {
+            border-color: var(--accent);
+            box-shadow: var(--shadow-glow);
+        }
+
+        /* Disabled input style */
+        input[type="text"]:disabled {
+            background: rgba(30, 36, 50, 0.4);
+            color: var(--text-muted);
+            cursor: not-allowed;
+            border-color: rgba(148, 163, 184, 0.05);
+        }
+
+        /* Presets Container and Chips */
+        .presets-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: -10px;
+            /* Pull it slightly closer to the prompt */
+        }
+
+        .preset-chip {
+            padding: 6px 12px;
+            background-color: var(--bg-input);
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid var(--border);
+        }
+
+        .preset-chip:hover {
+            background-color: var(--accent);
+            color: white;
+            border-color: var(--accent);
+            transform: translateY(-1px);
+        }
+
+
+        /* Sliders */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 8px;
+            background: var(--bg-input);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 20px;
+            width: 20px;
+            background: var(--accent);
+            border-radius: 50%;
+            margin-top: -6px;
+            box-shadow: 0 0 10px var(--accent);
+            transition: transform 0.1s, box-shadow 0.2s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+        }
+
+        /* Color Picker Custom */
+        .color-wrapper {
+            position: relative;
+            height: 48px;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 2px solid var(--border);
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .color-wrapper:hover {
+            border-color: var(--accent);
+        }
+
+        /* Disabled Color Picker Styling */
+        .color-wrapper[disabled] {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .color-wrapper[disabled]:hover {
+            border-color: var(--border);
+        }
+
+        input[type="color"] {
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            cursor: pointer;
+            border: none;
+        }
+
+        /* Mode Switcher */
+        .mode-switch {
+            display: flex;
+            background: var(--bg-input);
+            padding: 5px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+        }
+
+        .mode-btn {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .mode-btn.active {
+            background: var(--accent);
+            color: white;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Action Buttons */
+        .btn-row {
+            margin-top: auto;
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 15px;
+        }
+
+        button.action-btn {
+            padding: 15px;
+            border-radius: 10px;
+            border: none;
+            font-weight: 700;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn-secondary {
+            background: transparent;
+            border: 2px solid var(--border) !important;
+            color: var(--text-main);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: var(--text-muted) !important;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2), var(--shadow-glow);
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-hover);
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="app-frame">
+
+        <div class="visual-area">
+
+            <div id="canvasGroup" class="canvas-container">
+                <canvas id="singleCanvas" width="16" height="16" style="width: 256px; height: 256px;"></canvas>
+                <div class="canvas-label">Block Texture Preview (16x16)</div>
+            </div>
+
+            <div id="devMessage" class="dev-message hidden">
+                <div class="dev-icon">⚠️</div>
+                <div class="dev-text">Item generation is not available. Please switch to **Block Mode** to use the
+                    procedural engine.</div>
+            </div>
+
+            <div id="tilingGroup" class="tiling-preview">
+                <canvas id="tilingCanvas" width="48" height="48" style="width: 96px; height: 96px;"></canvas>
+                <div class="canvas-label" id="tilingLabel">Seamless</div>
+            </div>
+        </div>
+
+        <div class="controls-area">
+            <div class="header">
+                <h1>VoxGen Pro</h1>
+                <p>Procedural Material Engine</p>
+            </div>
+
+            <div class="mode-switch">
+                <button class="mode-btn active" id="btn-block" onclick="setMode('block')">✨ BLOCK MODE</button>
+                <button class="mode-btn" id="btn-item" onclick="setMode('item')">🛠️ ITEM MODE</button>
+            </div>
+
+            <div class="control-group">
+                <div class="label-row"><span>Prompt</span></div>
+                <input type="text" id="prompt" placeholder="Type material name (e.g., Stone, Lava, Sand)..."
+                    value="Grass Block" onkeyup="if(event.key==='Enter') generate()">
+            </div>
+
+            <div class="presets-container" id="presetsContainer">
+                <div class="preset-chip" onclick="applyPreset('Grass Block')">Grass Block</div>
+                <div class="preset-chip" onclick="applyPreset('Dirt')">Dirt</div>
+                <div class="preset-chip" onclick="applyPreset('Sand')">Sand</div>
+                <div class="preset-chip" onclick="applyPreset('Gravel')">Gravel</div>
+                <div class="preset-chip" onclick="applyPreset('Cobblestone')">Cobblestone</div>
+                <div class="preset-chip" onclick="applyPreset('Stone Brick')">Stone Brick</div>
+                <div class="preset-chip" onclick="applyPreset('Diamond Block')">Diamond Block</div>
+                <div class="preset-chip" onclick="applyPreset('Oak Plank')">Oak Plank</div>
+                <div class="preset-chip" onclick="applyPreset('Ice')">Ice</div>
+                <div class="preset-chip" onclick="applyPreset('Magma')">Magma</div>
+            </div>
+
+            <div class="control-group">
+                <div class="label-row"><span>Base Color / Hue</span></div>
+                <div class="color-wrapper" id="colorWrapper">
+                    <input type="color" id="colorPicker" value="#528c46" oninput="updateLive()">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <div class="label-row">
+                    <span>Noise Scale</span>
+                    <span id="val-scale" class="val-display">3.0</span>
+                </div>
+                <input type="range" id="param-scale" min="10" max="80" value="30" oninput="updateLive()">
+            </div>
+
+            <div class="control-group">
+                <div class="label-row">
+                    <span>Contrast</span>
+                    <span id="val-contrast" class="val-display">1.2</span>
+                </div>
+                <input type="range" id="param-contrast" min="5" max="30" value="12" oninput="updateLive()">
+            </div>
+
+            <div class="control-group">
+                <div class="label-row">
+                    <span>Detail / Roughness</span>
+                    <span id="val-rough" class="val-display">1.0</span>
+                </div>
+                <input type="range" id="param-rough" min="0" max="200" value="100" oninput="updateLive()">
+            </div>
+
+            <div class="btn-row">
+                <button class="action-btn btn-secondary" onclick="generate()">
+                    🎲 Reroll
+                </button>
+                <button class="action-btn btn-primary" onclick="download()">
+                    ⬇️ Download PNG
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* --- CORE LOGIC --- */
+
+        const canvas = document.getElementById('singleCanvas');
+        const ctx = canvas.getContext('2d');
+        const tileCanvas = document.getElementById('tilingCanvas');
+        const tileCtx = tileCanvas.getContext('2d');
+        const tilingLabel = document.getElementById('tilingLabel');
+        const promptInput = document.getElementById('prompt');
+        const colorPicker = document.getElementById('colorPicker');
+        const colorWrapper = document.getElementById('colorWrapper');
+        const presetsContainer = document.getElementById('presetsContainer');
+
+        let lastBlockPrompt = 'Grass Block';
+        let currentMode = 'block';
+        let currentSeed = 123;
+
+        // --- NOISE ENGINE (Simplified Perlin - UNCHANGED) ---
+        const PERM = new Uint8Array(512);
+        function initSeed(s) {
+            let localSeed = s;
+            const p = new Uint8Array(256).map((_, i) => i);
+            for (let i = 255; i > 0; i--) {
+                localSeed = (localSeed * 9301 + 49297) % 233280;
+                const r = Math.floor((localSeed / 233280) * (i + 1));
+                [p[i], p[r]] = [p[r], p[i]];
+            }
+            for (let i = 0; i < 512; i++) PERM[i] = p[i & 255];
+        }
+        function fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+        function lerp(t, a, b) { return a + t * (b - a); }
+        function grad(hash, x, y) {
+            const h = hash & 15;
+            const u = h < 8 ? x : y;
+            const v = h < 4 ? y : h === 12 || h === 14 ? x : 0;
+            return ((h & 1) === 0 ? u : -u) + ((h & 2) === 0 ? v : -v);
+        }
+        function pnoise(x, y, period) {
+            let X = Math.floor(x) % period;
+            let Y = Math.floor(y) % period;
+            if (X < 0) X += period; if (Y < 0) Y += period;
+            x -= Math.floor(x); y -= Math.floor(y);
+            const u = fade(x), v = fade(y);
+            const A = (PERM[X] + Y) % 256, B = (PERM[(X + 1) % period] + Y) % 256;
+            return lerp(v,
+                lerp(u, grad(PERM[PERM[A]], x, y), grad(PERM[PERM[B]], x - 1, y)),
+                lerp(u, grad(PERM[PERM[(A + 1) % 256]], x, y - 1), grad(PERM[PERM[(B + 1) % 256]], x - 1, y - 1))
+            );
+        }
+        function fBm(x, y, octaves, persistence, scale) {
+            let total = 0, frequency = 1 / scale, amplitude = 1, maxValue = 0;
+            for (let i = 0; i < octaves; i++) {
+                total += pnoise(x * frequency, y * frequency, 16 * frequency) * amplitude;
+                maxValue += amplitude;
+                amplitude *= persistence;
+                frequency *= 2;
+            }
+            return (total / maxValue) + 0.5;
+        }
+
+        // --- UTILS ---
+        function simpleHash(str) {
+            let hash = 0;
+            for (let i = 0; i < str.length; i++) hash = ((hash << 5) - hash) + str.charCodeAt(i) | 0;
+            return Math.abs(hash);
+        }
+
+        // --- COLOR LOGIC (UNCHANGED) ---
+        function HSLtoRGB(h, s, l) {
+            s /= 100; l /= 100;
+            let c = (1 - Math.abs(2 * l - 1)) * s;
+            let x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+            let m = l - c / 2;
+            let r = 0, g = 0, b = 0;
+            if (h < 60) { r = c; g = x; b = 0; } else if (h < 120) { r = x; g = c; b = 0; }
+            else if (h < 180) { r = 0; g = c; b = x; } else if (h < 240) { r = 0; g = x; b = c; }
+            else if (h < 300) { r = x; g = 0; b = c; } else { r = c; g = 0; b = x; }
+            return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
+        }
+
+        function hexToHSL(H) {
+            let r = 0, g = 0, b = 0;
+            if (H.length == 4) {
+                r = "0x" + H[1] + H[1]; g = "0x" + H[2] + H[2]; b = "0x" + H[3] + H[3];
+            } else if (H.length == 7) {
+                r = "0x" + H[1] + H[2]; g = "0x" + H[3] + H[4]; b = "0x" + H[5] + H[6];
+            }
+            r /= 255; g /= 255; b /= 255;
+            let cmin = Math.min(r, g, b), cmax = Math.max(r, g, b), delta = cmax - cmin;
+            let h = 0, s = 0, l = 0;
+            if (delta == 0) h = 0;
+            else if (cmax == r) h = ((g - b) / delta) % 6;
+            else if (cmax == g) h = (b - r) / delta + 2;
+            else h = (r - g) / delta + 4;
+            h = Math.round(h * 60); if (h < 0) h += 360;
+            l = (cmax + cmin) / 2;
+            s = delta == 0 ? 0 : delta / (1 - Math.abs(2 * l - 1));
+            return { h, s: +(s * 100).toFixed(1), l: +(l * 100).toFixed(1) };
+        }
+
+        /* --- APP CONTROLS --- */
+
+        const BLOCK_PRESET_COLORS = {
+            'Grass Block': '#528c46',
+            'Dirt': '#7a523e',
+            'Sand': '#f6e5a6',
+            'Gravel': '#9b9492',
+            'Cobblestone': '#727272',
+            'Stone Brick': '#848484',
+            'Diamond Block': '#6be9e1',
+            'Oak Plank': '#b8945a',
+            'Ice': '#76a5c1',
+            'Magma': '#e66a00',
+
+            // Lowercase checks for fallbacks (used in generate() function's color logic)
+            'stone': '#848484',
+            'dirt': '#7a523e',
+            'magma': '#e66a00',
+            'ice': '#76a5c1',
+            'gold': '#fdd71d',
+            'diamond': '#6be9e1',
+            'grass': '#528c46',
+            'log': '#8b573a', // Log/Wood will now use procedural generation with this color
+            'default': '#5d8cf2'
+        };
+
+        function applyPreset(name) {
+            if (currentMode === 'block') {
+                promptInput.value = name;
+                generate();
+            }
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+
+            // Toggle Buttons
+            document.getElementById('btn-block').className = mode === 'block' ? 'mode-btn active' : 'mode-btn';
+            document.getElementById('btn-item').className = mode === 'item' ? 'mode-btn active' : 'mode-btn';
+
+            // Toggle Visuals
+            const canvasGroup = document.getElementById('canvasGroup');
+            const devMessage = document.getElementById('devMessage');
+            const tilingGroup = document.getElementById('tilingGroup');
+
+            if (mode === 'block') {
+                // ENABLE BLOCK CONTROLS
+                canvasGroup.classList.remove('hidden');
+                tilingGroup.classList.remove('hidden');
+                devMessage.classList.add('hidden');
+
+                // Show Presets
+                presetsContainer.classList.remove('hidden');
+
+                promptInput.disabled = false;
+                promptInput.placeholder = "Type material name (e.g., Stone, Lava, Sand)...";
+
+                // If it was 'Generic Item', restore the last functional block prompt
+                if (promptInput.value === 'Generic Item') {
+                    promptInput.value = lastBlockPrompt;
+                }
+
+                colorWrapper.removeAttribute('disabled');
+                colorPicker.disabled = false;
+
+                generate(); // Re-render block
+            } else {
+                // ITEM MODE (DISABLED CONTROLS)
+                canvasGroup.classList.add('hidden');
+                tilingGroup.classList.add('hidden');
+                devMessage.classList.remove('hidden');
+
+                // Hide Presets
+                presetsContainer.classList.add('hidden');
+
+                // Save current prompt before disabling
+                lastBlockPrompt = promptInput.value;
+
+                promptInput.value = 'Generic Item'; // Set simple placeholder text
+                promptInput.disabled = true;
+                promptInput.placeholder = 'Item generation is disabled.';
+
+                colorWrapper.setAttribute('disabled', '');
+                colorPicker.disabled = true;
+
+                // No generation triggered here
+            }
+        }
+
+        function updateLive() {
+            // Only update live values and re-render if in Block Mode
+            if (currentMode !== 'block') return;
+
+            const scale = document.getElementById('param-scale').value;
+            const rough = document.getElementById('param-rough').value;
+            const contrast = document.getElementById('param-contrast').value;
+
+            document.getElementById('val-scale').innerText = (scale / 10).toFixed(1);
+            document.getElementById('val-rough').innerText = (rough / 100).toFixed(1);
+            document.getElementById('val-contrast').innerText = (contrast / 10).toFixed(1);
+
+            render();
+        }
+
+        function generate() {
+            // Only proceed with generation if in Block Mode
+            if (currentMode === 'item') return;
+
+            const text = promptInput.value.trim();
+            const low = text.toLowerCase();
+            currentSeed = simpleHash(text) + Math.floor(Math.random() * 100);
+
+            // 1. Check for Block Presets (Case-sensitive and lower-case checks)
+            let hex = BLOCK_PRESET_COLORS[text] || BLOCK_PRESET_COLORS[low];
+
+            // 2. Fallback: If not a known block name, use keyword-based HSL logic
+            if (!hex) {
+                let h = 0, s = 0, l = 50;
+
+                if (low.includes('slime') || low.includes('lime')) { h = 100; s = 60; l = 40; }
+                else if (low.includes('fire') || low.includes('lava')) { h = 15; s = 90; l = 50; }
+                else if (low.includes('sand') || low.includes('desert')) { h = 40; s = 40; l = 70; }
+                else if (low.includes('wood') || low.includes('plank') || low.includes('oak') || low.includes('log')) { h = 25; s = 50; l = 35; }
+                else if (low.includes('redstone') || low.includes('ruby') || low.includes('red')) { h = 0; s = 80; l = 50; }
+                else if (low.includes('blue') || low.includes('water')) { h = 220; s = 60; l = 50; }
+                else {
+                    // Fully random color for unknown input
+                    h = currentSeed % 360; s = 50 + (currentSeed % 30); l = 50;
+                }
+                const rgb = HSLtoRGB(h, s, l);
+                hex = "#" + ((1 << 24) + (rgb[0] << 16) + (rgb[1] << 8) + rgb[2]).toString(16).slice(1);
+            }
+
+            colorPicker.value = hex;
+
+            updateLive();
+        }
+
+        function render() {
+            // Just for safety
+            if (currentMode === 'item') return;
+
+            initSeed(currentSeed);
+            const scale = document.getElementById('param-scale').value / 10;
+            const rough = document.getElementById('param-rough').value / 100;
+            const contrast = document.getElementById('param-contrast').value / 10;
+            const hexColor = document.getElementById('colorPicker').value;
+            let baseCol = hexToHSL(hexColor);
+            const lowPrompt = promptInput.value.toLowerCase();
+
+            ctx.clearRect(0, 0, 16, 16); // Clear for fresh render
+
+            tilingLabel.innerText = "Seamless"; // All remaining blocks are seamless
+            renderProcedural(ctx, scale, rough, contrast, baseCol, lowPrompt);
+
+            // Update Tiling View (always tiles now)
+            tileCtx.imageSmoothingEnabled = false;
+            tileCtx.clearRect(0, 0, 48, 48);
+
+            for (let ty = 0; ty < 3; ty++) {
+                for (let tx = 0; tx < 3; tx++) {
+                    tileCtx.drawImage(canvas, tx * 16, ty * 16);
+                }
+            }
+        }
+
+        // Extracted procedural rendering into a separate function for clarity
+        function renderProcedural(ctx, scale, rough, contrast, baseCol, lowPrompt) {
+            const imgData = ctx.createImageData(16, 16);
+            const data = imgData.data;
+
+            // Generate Height Map
+            let heightMap = new Float32Array(256);
+            for (let i = 0; i < 256; i++) {
+                let x = i % 16; let y = Math.floor(i / 16);
+
+                // Uses 6 octaves for richer detail
+                let n = fBm(x, y, 6, 0.5, scale);
+
+                n = (n - 0.5) * contrast + 0.5;
+                let g = (Math.sin((x + currentSeed) * 12.9898 + (y + currentSeed) * 78.233) * 43758.5453) % 1;
+                heightMap[i] = n + (g * rough * 0.1);
+            }
+
+            // Render Pixels
+            for (let i = 0; i < 256; i++) {
+                let idx = i * 4;
+                let x = i % 16;
+                let y = Math.floor(i / 16);
+                let val = heightMap[i];
+                if (val < 0) val = 0; if (val > 1) val = 1;
+
+                let lightNorm = val;
+                let finalL = baseCol.l + ((lightNorm - 0.5) * 35);
+                let finalH = baseCol.h;
+                let finalS = baseCol.s;
+
+                // All specialized ore logic removed.
+
+                if (finalL > 100) finalL = 100;
+                if (finalL < 0) finalL = 0;
+
+                const rgb = HSLtoRGB(finalH, finalS, finalL);
+                data[idx] = rgb[0];
+                data[idx + 1] = rgb[1];
+                data[idx + 2] = rgb[2];
+                data[idx + 3] = 255;
+            }
+
+            ctx.putImageData(imgData, 0, 0);
+        }
+
+        function download() {
+            if (currentMode === 'item') {
+                alert("The Item Generator model is still under development.");
+                return;
+            }
+            const link = document.createElement('a');
+            const name = document.getElementById('prompt').value.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+            link.download = `voxgen_${name}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+
+        // Init: Call generate directly since there are no images to load first
+        window.onload = generate;
+
+    </script>
+</body>
+
+</html>
